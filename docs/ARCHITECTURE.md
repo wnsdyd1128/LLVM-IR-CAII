@@ -267,7 +267,6 @@ class CacheAnalysisPipeline {
 public:
     explicit CacheAnalysisPipeline(PipelineConfig config);
     std::vector<CAIIResult> run(llvm::Module &M);
-    const std::vector<Diagnostic>& diagnostics() const;
 };
 ```
 
@@ -340,33 +339,32 @@ build/caii-analyzer task_inlined.bc \
 
 ```
 include/
-├── CacheConfig.hpp                        (기존 — GR740 HW 상수)
+├── CacheConfig.hpp                        (구현 완료 — GR740 HW 상수)
 └── caii/
-    ├── AnalysisPass.hpp                   (기존 — checker pass 기반)
-    ├── IRLoader.hpp                       (기존)
-    ├── CacheTypes.hpp                     (신규 — BBAccessMap, AddressRange, TaskMeta)
-    ├── CAIResult.hpp                      (신규 — δ_i^j, r_i^j, CA_i)
-    ├── CAIIResult.hpp                     (신규 — CAII_static + 중간 결과 전체)
-    ├── CacheAnalysisPipeline.hpp          (신규 — 파이프라인 오케스트레이터)
+    ├── IRLoader.hpp                       (구현 완료 — .bc/.ll 로드)
+    ├── CacheTypes.hpp                     (예정 — BBAccessMap, AddressRange, TaskMeta)
+    ├── CAIResult.hpp                      (예정 — δ_i^j, r_i^j, CA_i)
+    ├── CAIIResult.hpp                     (예정 — CAII_static + 중간 결과 전체)
+    ├── CacheAnalysisPipeline.hpp          (예정 — 파이프라인 오케스트레이터)
     └── passes/
-        ├── MemAccessCollectorPass.hpp     (신규 — P1)
-        ├── ECBExtractorPass.hpp           (신규 — P2)
-        ├── UCBDataflowPass.hpp            (신규 — P3)
-        ├── HBExtractorPass.hpp            (신규 — P4)
-        ├── InterferenceComputePass.hpp    (신규 — P5)
-        └── CAIComputePass.hpp             (신규 — CA_i)
+        ├── MemAccessCollectorPass.hpp     (예정 — P1)
+        ├── ECBExtractorPass.hpp           (예정 — P2)
+        ├── UCBDataflowPass.hpp            (예정 — P3)
+        ├── HBExtractorPass.hpp            (예정 — P4)
+        ├── InterferenceComputePass.hpp    (예정 — P5)
+        └── CAIComputePass.hpp             (예정 — CA_i)
 
-src/passes/
-├── NullDerefChecker.cpp                   (기존)
-├── StackUsageAnalyzer.cpp                 (기존)
-├── RTEMSAPIChecker.cpp                    (기존)
-├── MemAccessCollectorPass.cpp             (신규)
-├── ECBExtractorPass.cpp                   (신규)
-├── UCBDataflowPass.cpp                    (신규)
-├── HBExtractorPass.cpp                    (신규)
-├── InterferenceComputePass.cpp            (신규)
-├── CAIComputePass.cpp                     (신규)
-└── CacheAnalysisPipeline.cpp              (신규)
+src/
+├── IRLoader.cpp                           (구현 완료)
+├── main.cpp                               (구현 완료 — CLI 스켈레톤)
+└── passes/
+    ├── MemAccessCollectorPass.cpp         (예정)
+    ├── ECBExtractorPass.cpp               (예정)
+    ├── UCBDataflowPass.cpp                (예정)
+    ├── HBExtractorPass.cpp                (예정)
+    ├── InterferenceComputePass.cpp        (예정)
+    ├── CAIComputePass.cpp                 (예정)
+    └── CacheAnalysisPipeline.cpp          (예정)
 ```
 
 ---

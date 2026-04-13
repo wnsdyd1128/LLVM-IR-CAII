@@ -104,64 +104,11 @@ GR740 캐시 파라미터: N_LLC=4, S=16,384 sets, b=32B, L2=2MiB (→ [`include
 
 ---
 
-## 결함 탐지 Pass
-
-### NullDerefChecker
-
-`malloc` / `rtems_malloc` 계열 반환값을 null 체크 없이 바로 역참조하는 패턴과, 상수 null 포인터를 직접 load/store 하는 패턴을 탐지한다.
-
-```c
-char *buf = malloc(256);
-memset(buf, 0, 256);   // warning: Allocation result used without null check
-```
-
-### StackUsageAnalyzer
-
-함수별 정적 `alloca` 합산으로 스택 사용량을 추정한다. GR740 BSP 기본 태스크 스택 기준:
-
-| 임계값 | 진단 등급 |
-|---|---|
-| ≥ 2 KB | warning |
-| ≥ 4 KB | error |
-
-```c
-void process_telemetry(void) {
-    char local_buf[8192];   // error: Estimated static stack: 8192 bytes
-}
-```
-
-### RTEMSAPIChecker
-
-세 가지 RTEMS API 규칙 위반을 탐지한다:
-
-| 검사 항목 | 진단 등급 |
-|---|---|
-| ISR 컨텍스트에서 블로킹 API 호출 (`rtems_semaphore_obtain` 등) | error |
-| `rtems_task_delete(RTEMS_SELF)` 이후 도달 가능한 코드 | warning |
-| `rtems_status_code` 반환 API 결과 무시 | warning |
-
----
-
-## CLI 옵션
-
-```
-caii-analyzer [options] <input.bc|input.ll>
-
-옵션:
-  --pass <name>   특정 Pass만 실행 (반복 가능). 생략 시 전체 실행.
-  --no-color      컬러 출력 비활성화
-
-예시:
-  build/caii-analyzer app.bc
-  build/caii-analyzer app.bc --pass NullDerefChecker --pass RTEMSAPIChecker
-```
-
-## opt 플러그인으로 실행
+## CLI 현재 상태
 
 ```bash
-opt --load-pass-plugin=build/caii_plugin.so \
-    --passes="caii-all" \
-    examples/hello_rtems.bc -o /dev/null
+build/caii-analyzer <input.bc|input.ll>
+# → 모듈 로딩 확인 (CacheAnalysisPipeline 구현 예정)
 ```
 
 ---
@@ -184,30 +131,6 @@ clang --target=sparc-unknown-rtems6 \
 
 > GCC `include/` 디렉토리를 포함하면 GCC의 `stdatomic.h`가 선택되어
 > `_Atomic` 타입 불일치 오류가 발생한다.
-
----
-
-## 새 Pass 추가하기
-
-1. `include/caii/AnalysisPass.hpp`의 `AnalysisPass`를 상속받아 구현
-2. `src/passes/MyPass.cpp` 작성 — `run(Module &M)` 에서 `Diagnostic` 목록 반환
-3. `src/main.cpp`와 `src/PluginEntry.cpp`에 팩토리 함수 등록
-4. `CMakeLists.txt`의 `caii-analyzer` / `caii_plugin` 소스 목록에 추가
-
-```cpp
-// src/passes/MyPass.cpp
-namespace caii {
-class MyPass : public AnalysisPass {
-public:
-    std::string name() const override { return "MyPass"; }
-    std::string description() const override { return "..."; }
-    std::vector<Diagnostic> run(llvm::Module &M) override { ... }
-};
-std::unique_ptr<AnalysisPass> createMyPass() {
-    return std::make_unique<MyPass>();
-}
-} // namespace caii
-```
 
 ---
 

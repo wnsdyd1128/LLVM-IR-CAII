@@ -1,9 +1,14 @@
-# HANDOFF: llvm-ir-caii — RTEMS 6.0 / GR740 LLVM IR 정적 분석 도구
+# HANDOFF: llvm-ir-caii — RTEMS 6.0 / GR740 LLVM IR 캐시 친화도 분석 도구
 
 ## Goal
 
-RTEMS 6.0 + GR740(SPARC V8, LEON4) 환경을 대상으로 하는 **LLVM IR API 기반 정적 분석 도구** 개발.
-CAAS 논문의 Cache Affinity Indicator(CA) 분석 등 IR 레벨 분석 Pass를 확장해나가는 것이 최종 목적이다.
+RTEMS 6.0 + GR740(SPARC V8, LEON4) 환경에서 **LLVM IR 기반으로 CAII 지표를 정적 추출**한다.
+- CAAS 논문의 CA_i (재사용 거리 기반 캐시 친화도 지표)
+- 크로스-코어 캐시 간섭 항 Ī_i^{c,static} (HB/ECB/CB 집합 분석)
+- 선점 지연 항 CRPD̄_i^static (UCB/ECB 데이터플로우 분석)
+- 최종 복합 지표 CAII_i^static = CA_i / (1 + Ī + CRPD̄)
+
+결함 탐지(NullDeref 등)는 초기 개발환경 검증용이었으므로 제거됨.
 
 ## 환경 요약
 
@@ -21,28 +26,31 @@ CAAS 논문의 Cache Affinity Indicator(CA) 분석 등 IR 레벨 분석 Pass를 
 /workspace/llvm-ir-caii/
 ├── .clangd                         # VSCode clangd 설정 (RTEMS 헤더 경로)
 ├── CMakeLists.txt                  # LLVM 링크 설정 (find_package 방식)
+├── docs/
+│   └── ARCHITECTURE.md            # CAII 파이프라인 아키텍처 설계서
 ├── build/                          # cmake 빌드 출력
 │   ├── caii-analyzer               # 스탠드얼론 분석기 실행 파일
-│   ├── caii_plugin.so              # opt --load-pass-plugin 플러그인
-│   └── compile_commands.json       # C++ 분석기 소스용 (RTEMS C 소스는 미포함)
-├── include/caii/
-│   ├── IRLoader.hpp                # .bc/.ll 로드 인터페이스
-│   └── AnalysisPass.hpp            # Pass 기반 인터페이스 + Diagnostic 타입
+│   └── compile_commands.json
+├── include/
+│   ├── CacheConfig.hpp             # GR740 L2 HW 상수 (N_LLC=4, S=16384, b=32B)
+│   └── caii/
+│       ├── IRLoader.hpp            # .bc/.ll 로드 인터페이스
+│       ├── CacheTypes.hpp          # (예정) BBAccessMap, AddressRange, TaskMeta
+│       ├── CAIResult.hpp           # (예정) CA_i 결과 타입
+│       ├── CAIIResult.hpp          # (예정) CAII_static + 중간 결과
+│       ├── CacheAnalysisPipeline.hpp # (예정) 파이프라인 오케스트레이터
+│       └── passes/                 # (예정) P1~P5, CAI 패스 헤더
 ├── src/
 │   ├── IRLoader.cpp
-│   ├── main.cpp                    # CLI 분석기 (--pass 옵션으로 필터 가능)
-│   ├── PluginEntry.cpp             # opt 플러그인 진입점 (caii-all pass)
-│   └── passes/
-│       ├── NullDerefChecker.cpp    # malloc 반환값 null 체크 누락, null 직접 역참조
-│       ├── StackUsageAnalyzer.cpp  # alloca 합산 → 스택 사용량 추정 (경고 2KB, 오류 4KB)
-│       └── RTEMSAPIChecker.cpp     # ISR에서 블로킹 API 호출, delete(SELF) 후 코드, 반환값 무시
+│   ├── main.cpp                    # CLI 진입점 (CacheAnalysisPipeline 호출 예정)
+│   └── passes/                     # (예정) P1~P5, CAI 패스 구현
 ├── scripts/
 │   ├── env.sh                      # PATH/LLVM_DIR 환경변수 (source 해서 사용)
 │   ├── build.sh                    # cmake 빌드 래퍼
 │   ├── compile-to-ir.sh            # C → SPARC RTEMS6 LLVM IR (.bc + .ll)
 │   └── analyze.sh                  # 분석기 실행 래퍼
 └── examples/
-    ├── hello_rtems.c               # 결함 3종 포함 예제 소스
+    ├── hello_rtems.c               # 예제 RTEMS 태스크 소스
     ├── hello_rtems.bc              # 생성된 LLVM bitcode
     └── hello_rtems.ll              # 생성된 human-readable IR
 ```
@@ -52,11 +60,9 @@ CAAS 논문의 Cache Affinity Indicator(CA) 분석 등 IR 레벨 분석 Pass를 
 ### 기본 개발환경 구축 완료
 
 - [x] CMake 프로젝트 설정 (LLVM 23 링크)
-- [x] 빌드 성공: `caii-analyzer`, `caii_plugin.so`
+- [x] 빌드 성공: `caii-analyzer`
 - [x] SPARC RTEMS6 타겟 IR 생성 성공 (`hello_rtems.bc`)
-- [x] 분석기 실행 및 결과 확인 (5개 진단 탐지)
 - [x] VSCode clangd에서 RTEMS 헤더 인식 (`/workspace/llvm-ir-caii/.clangd`)
-- [x] README.md 작성 (`/workspace/llvm-ir-caii/README.md`)
 
 ### CAII 파이프라인 설계 완료
 

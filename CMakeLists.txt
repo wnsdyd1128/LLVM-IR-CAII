@@ -24,20 +24,5 @@ add_library(caii_common STATIC src/IRLoader.cpp)
 target_link_libraries(caii_common PUBLIC ${LLVM_LIBS})
 
 # ── 스탠드얼론 분석기 ──────────────────────────────────────────────────
-add_executable(caii-analyzer
-    src/main.cpp
-    src/passes/NullDerefChecker.cpp
-    src/passes/StackUsageAnalyzer.cpp
-    src/passes/RTEMSAPIChecker.cpp
-)
+add_executable(caii-analyzer src/main.cpp)
 target_link_libraries(caii-analyzer PRIVATE caii_common)
-
-# ── opt 플러그인 (opt --load-pass-plugin=./caii_plugin.so) ─────────────
-add_library(caii_plugin MODULE
-    src/passes/NullDerefChecker.cpp
-    src/passes/StackUsageAnalyzer.cpp
-    src/passes/RTEMSAPIChecker.cpp
-    src/PluginEntry.cpp
-)
-target_link_libraries(caii_plugin PRIVATE ${LLVM_LIBS})
-set_target_properties(caii_plugin PROPERTIES PREFIX "" SUFFIX ".so")

@@ -1,4 +1,4 @@
-#include "caii/AnalysisPass.h"
+#include "caii/AnalysisPass.hpp"
 
 #include <llvm/IR/PassManager.h>
 #include <llvm/Passes/PassBuilder.h>

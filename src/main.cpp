@@ -1,5 +1,5 @@
-#include "caii/AnalysisPass.h"
-#include "caii/IRLoader.h"
+#include "caii/AnalysisPass.hpp"
+#include "caii/IRLoader.hpp"
 
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/InitLLVM.h>

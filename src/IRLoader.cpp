@@ -1,4 +1,4 @@
-#include "caii/IRLoader.h"
+#include "caii/IRLoader.hpp"
 
 #include <llvm/Bitcode/BitcodeReader.h>
 #include <llvm/IR/LLVMContext.h>

@@ -1,4 +1,4 @@
-#include "caii/AnalysisPass.h"
+#include "caii/AnalysisPass.hpp"
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/Instructions.h>

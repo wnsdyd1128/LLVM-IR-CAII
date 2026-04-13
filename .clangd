@@ -1,0 +1,31 @@
+# llvm-ir-caii 프로젝트 clangd 설정
+#
+# ─ 분석기 소스 (src/**/*.cpp, include/**/*.h) ─────────────────────────
+#   → build/compile_commands.json 의 호스트 C++ 플래그 사용 (별도 설정 불필요)
+#
+# ─ RTEMS 대상 소스 (examples/**/*.c, 기타 .c) ───────────────────────
+#   → compile_commands.json 에 항목이 없어 clangd 가 호스트 플래그를 잘못 적용함
+#   → 아래에서 SPARC RTEMS6/GR740 플래그를 명시적으로 주입
+
+---
+If:
+  PathMatch: .*\.c$
+CompileFlags:
+  Compiler: /workspace/llvm-project/build/bin/clang
+  Add:
+    - --target=sparc-rtems6
+    - -mcpu=leon3
+    # GR740 BSP 헤더 (rtems.h, bsp.h 등) — settings.json fallbackFlags 와 동일
+    - -isystem/opt/rtems/6/sparc-rtems6/gr740/lib/include
+    # RTEMS SPARC 공통 헤더 (sys/*.h, limits.h 등) — settings.json 과 동일
+    - -isystem/opt/rtems/6/sparc-rtems6/include
+    # GCC include-fixed (limits.h 패치 — 컴파일 시 필요했던 경로)
+    - -isystem/opt/rtems/6/lib/gcc/sparc-rtems6/13.3.0/include-fixed
+    - -D__leon__
+    - -D__sparc_v8__
+    - -D__rtems__
+    - -DRTEMS_POSIX_API
+  # compile_commands.json 에서 가져온 호스트 타겟 플래그 제거
+  Remove:
+    - --target=*
+    - -m*

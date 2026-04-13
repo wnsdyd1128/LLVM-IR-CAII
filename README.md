@@ -2,7 +2,10 @@
 
 RTEMS 6.0 + GR740(SPARC V8, LEON4) 환경을 대상으로 하는 **LLVM IR API 기반 정적 분석 도구**.
 
-C 소스를 SPARC RTEMS6 타겟 LLVM IR로 변환하고, IR 레벨 Analysis Pass로 RTEMS 특화 결함을 탐지한다.
+C 소스를 SPARC RTEMS6 타겟 LLVM IR로 변환하고, IR 레벨 Analysis Pass로 두 가지 목적을 달성한다:
+
+1. **결함 탐지** — RTEMS 특화 버그 패턴 (null 역참조, 스택 과다 사용, ISR 블로킹 API)
+2. **CAII 지표 추출** — 태스크의 캐시 친화도(CA_i) + 크로스-코어 간섭 + 선점 지연을 정적으로 계산하여 CAAS 스케줄링 아키텍처 선택에 활용
 
 ---
 
@@ -41,9 +44,24 @@ build/caii-analyzer examples/hello_rtems.bc
 ```
 llvm-ir-caii/
 ├── CMakeLists.txt
-├── include/caii/
-│   ├── IRLoader.h          # .bc / .ll 파일 로드
-│   └── AnalysisPass.h      # Pass 인터페이스 + Diagnostic 타입
+├── docs/
+│   └── ARCHITECTURE.md     # CAII 파이프라인 아키텍처 설계서
+├── include/
+│   ├── CacheConfig.hpp     # GR740 L2 캐시 HW 상수 (N_LLC=4, S=16384, b=32B)
+│   └── caii/
+│       ├── IRLoader.hpp            # .bc / .ll 파일 로드
+│       ├── AnalysisPass.hpp        # 결함 탐지 Pass 기반 인터페이스 + Diagnostic
+│       ├── CacheTypes.hpp          # (예정) BBAccessMap, AddressRange, TaskMeta
+│       ├── CAIResult.hpp           # (예정) δ_i^j, r_i^j, CA_i 결과 타입
+│       ├── CAIIResult.hpp          # (예정) CAII_static + 중간 결과 전체
+│       ├── CacheAnalysisPipeline.hpp # (예정) 파이프라인 오케스트레이터
+│       └── passes/
+│           ├── MemAccessCollectorPass.hpp  # (예정) P1
+│           ├── ECBExtractorPass.hpp        # (예정) P2
+│           ├── UCBDataflowPass.hpp         # (예정) P3
+│           ├── HBExtractorPass.hpp         # (예정) P4
+│           ├── InterferenceComputePass.hpp # (예정) P5
+│           └── CAIComputePass.hpp          # (예정) CA_i
 ├── src/
 │   ├── main.cpp            # 스탠드얼론 분석기 CLI
 │   ├── IRLoader.cpp
@@ -63,7 +81,30 @@ llvm-ir-caii/
 
 ---
 
-## 분석 Pass
+## CAII 지표 파이프라인 (설계 중)
+
+CAAS 논문의 CA_i에 크로스-코어 캐시 간섭과 선점 지연(CRPD)을 추가한 복합 지표.
+
+```
+CAII_i^static = CA_i / (1 + Ī_i^{c,static} + CRPD̄_i^static)
+```
+
+| 패스 | 출력 | 설명 |
+|---|---|---|
+| P1 `MemAccessCollectorPass` | BBAccessMap | BB별 접근 캐시 블록 집합 |
+| P2 `ECBExtractorPass` | ECB_i | 태스크 Evicting Cache Block 전체 합집합 |
+| P3 `UCBDataflowPass` | UCB_i(p), max\|UCB\| | Forward Must + Backward GEN/KILL 데이터플로우 |
+| P4 `HBExtractorPass` | HB_i | 다음 주기 시작 시 히트 기대 블록 |
+| P5 `InterferenceComputePass` | I_i^{c,static} | 크로스-코어 간섭 사이클 합산 |
+| CAI `CAIComputePass` | CA_i | 재사용 거리 기반 캐시 친화도 [0, 1] |
+
+GR740 캐시 파라미터: N_LLC=4, S=16,384 sets, b=32B, L2=2MiB (→ [`include/CacheConfig.hpp`](include/CacheConfig.hpp))
+
+자세한 설계: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
+---
+
+## 결함 탐지 Pass
 
 ### NullDerefChecker
 
@@ -148,7 +189,7 @@ clang --target=sparc-unknown-rtems6 \
 
 ## 새 Pass 추가하기
 
-1. `include/caii/AnalysisPass.h`의 `AnalysisPass`를 상속받아 구현
+1. `include/caii/AnalysisPass.hpp`의 `AnalysisPass`를 상속받아 구현
 2. `src/passes/MyPass.cpp` 작성 — `run(Module &M)` 에서 `Diagnostic` 목록 반환
 3. `src/main.cpp`와 `src/PluginEntry.cpp`에 팩토리 함수 등록
 4. `CMakeLists.txt`의 `caii-analyzer` / `caii_plugin` 소스 목록에 추가

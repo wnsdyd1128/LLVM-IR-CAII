@@ -26,8 +26,8 @@ CAAS 논문의 Cache Affinity Indicator(CA) 분석 등 IR 레벨 분석 Pass를 
 │   ├── caii_plugin.so              # opt --load-pass-plugin 플러그인
 │   └── compile_commands.json       # C++ 분석기 소스용 (RTEMS C 소스는 미포함)
 ├── include/caii/
-│   ├── IRLoader.h                  # .bc/.ll 로드 인터페이스
-│   └── AnalysisPass.h              # Pass 기반 인터페이스 + Diagnostic 타입
+│   ├── IRLoader.hpp                # .bc/.ll 로드 인터페이스
+│   └── AnalysisPass.hpp            # Pass 기반 인터페이스 + Diagnostic 타입
 ├── src/
 │   ├── IRLoader.cpp
 │   ├── main.cpp                    # CLI 분석기 (--pass 옵션으로 필터 가능)
@@ -47,13 +47,22 @@ CAAS 논문의 Cache Affinity Indicator(CA) 분석 등 IR 레벨 분석 Pass를 
     └── hello_rtems.ll              # 생성된 human-readable IR
 ```
 
-## Current Progress — 기본 개발환경 구축 완료
+## Current Progress
+
+### 기본 개발환경 구축 완료
 
 - [x] CMake 프로젝트 설정 (LLVM 23 링크)
 - [x] 빌드 성공: `caii-analyzer`, `caii_plugin.so`
 - [x] SPARC RTEMS6 타겟 IR 생성 성공 (`hello_rtems.bc`)
 - [x] 분석기 실행 및 결과 확인 (5개 진단 탐지)
 - [x] VSCode clangd에서 RTEMS 헤더 인식 (`/workspace/llvm-ir-caii/.clangd`)
+- [x] README.md 작성 (`/workspace/llvm-ir-caii/README.md`)
+
+### CAII 파이프라인 설계 완료
+
+- [x] GR740 캐시 하드웨어 상수 정의 (`include/CacheConfig.hpp`, N_LLC=4 확정)
+- [x] 헤더 확장자 `.h` → `.hpp` 통일
+- [x] 아키텍처 설계 문서 작성 (`docs/ARCHITECTURE.md`)
 
 ## 사용법
 
@@ -123,29 +132,48 @@ IR 레벨 분석은 Sparc 백엔드 코드젠 라이브러리가 불필요하므
 
 ## Next Steps
 
-### 단기 — Pass 확장
+### Phase 1 — 헤더 정의 (인터페이스 확정)
 
-1. **ReusedistanceAnalyzer**: CA 분석을 위한 reuse distance 추정 Pass 구현
-   - CAAS 논문의 CA_i 계산 로직을 IR 레벨에서 구현하는 것이 핵심 목표
-   - 참조: `/workspace/CAAS Cache Affinity Aware Scheduling Framework for RTEMS with Edge Computing Support.pdf`
+1. `include/caii/CacheTypes.hpp` — BBAccessMap, AddressRange, TaskMeta
+2. `include/caii/CAIResult.hpp` — δ_i^j, r_i^j, CA_i 결과 타입
+3. `include/caii/CAIIResult.hpp` — CAII_static + 중간 결과 전체
+4. `include/caii/passes/MemAccessCollectorPass.hpp` ~ `CAIComputePass.hpp` (6개)
+5. `include/caii/CacheAnalysisPipeline.hpp` — 파이프라인 오케스트레이터
 
-2. **NullDerefChecker 개선**: 현재는 단순 패턴만 탐지 → 인터프로시저 분석 추가
+### Phase 2 — P1, P2 구현 (기반 데이터 수집)
 
-3. **StackUsageAnalyzer 개선**: 콜 그래프를 타고 올라가며 누적 스택 계산
+6. `MemAccessCollectorPass.cpp` — Load/Store 순회, 주소 범위 3단계 해석
+7. `ECBExtractorPass.cpp` — BBAccessMap 합산 (경로 독립 over-approximation)
 
-### 중기 — 분석 파이프라인
+### Phase 3 — P3, P4 구현 (UCB/HB 분석)
 
-4. **실험 소스 분석**: `/workspace/experiments/cache-interference/` 의 exp1~exp5 소스를 IR로 변환 후 분석
-5. **링크타임 IR 생성**: 여러 `.c` 파일을 `llvm-link`로 합쳐 모듈 전체 분석
+8. `UCBDataflowPass.cpp` — Forward Must 분석 + Backward GEN/KILL worklist
+9. `HBExtractorPass.cpp` — Conservative(기본) / TailAccess 전략
 
-### clangd 남은 문제
+### Phase 4 — P5 + CAI 구현 (지표 계산)
 
-- `.clangd`의 `Remove: [-m*, --target=*]` 패턴이 clangd-14에서 완전히 동작하는지 확인 필요
-- clangd 재시작 후 `rtems.h` 오류 해소 여부 확인 (`Ctrl+Shift+P` → `clangd: Restart language server`)
+10. `InterferenceComputePass.cpp` — 집합별 LRU 충돌 분석, I_i^{c,static}
+11. `CAIComputePass.cpp` — CFG 경로 열거, 재사용 거리, CA_i 수식
+
+### Phase 5 — 파이프라인 통합
+
+12. `CacheAnalysisPipeline.cpp` — 오케스트레이터, JSON 직렬화
+13. `caii-analyzer` CLI 옵션 연동 (`--task-meta`, `--linker-map`, `--brt`, `--output`)
+14. 실험 소스 분석: `/workspace/experiments/cache-interference/` exp1~exp5
+
+### 기타 개선
+
+- **NullDerefChecker**: 인터프로시저 분석 추가
+- **StackUsageAnalyzer**: 콜 그래프 기반 누적 스택 계산
+- **clangd**: `.clangd`의 `Remove: [-m*, --target=*]` 패턴 clangd-14 동작 확인
 
 ## 참조
 
+- **아키텍처 설계서**: `/workspace/llvm-ir-caii/docs/ARCHITECTURE.md`
 - 실험 설계 문서: `/workspace/cache-interference-experiments.md`
 - 캐시 간섭 실험 handoff: `/workspace/HANDOFF.md`
 - 공통 빌드 시스템: `/workspace/experiments/common.mk`
 - CAAS 논문: `/workspace/CAAS Cache Affinity Aware Scheduling Framework for RTEMS with Edge Computing Support.pdf`
+- 기존 CAAS 논문의 CAIC 지표: `/workspace/CAI 지표 정리.pdf`
+- CAII 지표 정리 (GR740 확정값): `/workspace/CAII 지표 정리 (수정본 — GR740 확정값 반영)_apa.pdf`
+- LLVM IR 패스 설계서: `/workspace/LLVM IR 기반 캐시 간섭 지표 추출 패스 설계서 (GR740)_apa.pdf`

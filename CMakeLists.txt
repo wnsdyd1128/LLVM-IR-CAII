@@ -26,3 +26,17 @@ target_link_libraries(caii_common PUBLIC ${LLVM_LIBS})
 # ── 스탠드얼론 분석기 ──────────────────────────────────────────────────
 add_executable(caii-analyzer src/main.cpp)
 target_link_libraries(caii-analyzer PRIVATE caii_common)
+
+# ── Google Test (LLVM 번들 소스) ───────────────────────────────────────
+set(GTEST_DIR /workspace/llvm-project/third-party/unittest/googletest)
+
+add_library(gtest STATIC ${GTEST_DIR}/src/gtest-all.cc)
+target_include_directories(gtest PUBLIC ${GTEST_DIR}/include PRIVATE ${GTEST_DIR})
+target_compile_options(gtest PRIVATE -w)
+target_link_libraries(gtest PUBLIC pthread)
+
+add_library(gtest_main STATIC ${GTEST_DIR}/src/gtest_main.cc)
+target_link_libraries(gtest_main PUBLIC gtest)
+
+enable_testing()
+add_subdirectory(tests)

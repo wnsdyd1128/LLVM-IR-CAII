@@ -1,9 +1,8 @@
 #pragma once
+#include <cstdint>
 #include <unordered_set>
 namespace GR740Cache
 {
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
 
 constexpr uint32_t LINE_SIZE = 32;
 constexpr uint32_t NUM_WAYS = 4;
